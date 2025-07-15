@@ -2,11 +2,13 @@ import streamlit as st
 import pandas as pd
 from io import StringIO
 
+# Page setup
 st.set_page_config(page_title="Electricity Bill Splitter", layout="centered")
-# Apply custom styles for smaller font and input size
+
+# Custom styles
 st.markdown("""
     <style>
-    html, body, [class*="css"]  {
+    html, body, [class*="css"] {
         font-size: 14px;
     }
 
@@ -36,8 +38,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-st.title("💡 Electricity Bill Splitter ")
+# Title
+st.title("💡 Electricity Bill Splitter")
 st.markdown("Made by M.Zaid Naeem")
 
 # ---------------- Session State ------------------
@@ -72,7 +74,7 @@ with st.form("entry_form"):
     submitted = st.form_submit_button("✅ Add Entry")
 
     if submitted:
-        name = st.session_state.name_input.strip().lower()  # Use lowercase
+        name = st.session_state.name_input.strip().lower()
         start = st.session_state.start_input
         end = st.session_state.end_input
         other = st.session_state.other_input
@@ -98,57 +100,65 @@ with st.form("entry_form"):
                 st.session_state.data.append({"name": name, "units": total_units})
                 st.success(f"🆕 Created {name} with {total_units} units.")
 
-            # Clear fields after submission
+            # Clear inputs
             st.session_state.name_input = ""
             st.session_state.start_input = 0.0
             st.session_state.end_input = 0.0
             st.session_state.other_input = 0.0
 
 # ---------------- Final Summary ------------------
-if st.session_state.unit_sum > 0 and st.session_state.total_bill > 0:
-    per_unit_bill = st.session_state.total_bill / st.session_state.unit_sum
-
+if st.session_state.unit_sum > 0:
     st.markdown("---")
     st.markdown("### 📊 Final Summary")
     st.write(f"**Total Units ⚡:** {round(st.session_state.unit_sum, 2)}")
-    st.write(f"**Per Unit Cost 💸:** Rs. {round(per_unit_bill, 2)}")
 
-    # Table
+    # Calculate per unit cost if bill entered
+    per_unit_bill = (
+        st.session_state.total_bill / st.session_state.unit_sum
+        if st.session_state.total_bill > 0
+        else 0.0
+    )
+
+    if st.session_state.total_bill > 0:
+        st.write(f"**Per Unit Cost 💸:** Rs. {round(per_unit_bill, 2)}")
+    else:
+        st.warning("⚠️ Enter total bill to calculate individual shares.")
+
+    # Build table
     table_data = [
         {
             "Name": person["name"],
             "Units": round(person["units"], 2),
             "Bill (Rs.)": round(person["units"] * per_unit_bill, 2)
+            if st.session_state.total_bill > 0
+            else "—",
         }
         for person in st.session_state.data
     ]
     st.table(table_data)
 
     # ---------------- Export CSV ------------------
-    df_export = pd.DataFrame(table_data)
+    if st.session_state.total_bill > 0:
+        df_export = pd.DataFrame(table_data)
 
-    # Append summary rows
-    summary_df = pd.DataFrame({
-        "Name": ["Total Units", "Total Bill", "Per Unit Cost"],
-        "Units": [round(st.session_state.unit_sum, 2), "", ""],
-        "Bill (Rs.)": ["", round(st.session_state.total_bill, 2), round(per_unit_bill, 2)]
-    })
+        summary_df = pd.DataFrame({
+            "Name": ["Total Units", "Total Bill", "Per Unit Cost"],
+            "Units": [round(st.session_state.unit_sum, 2), "", ""],
+            "Bill (Rs.)": ["", round(st.session_state.total_bill, 2), round(per_unit_bill, 2)]
+        })
 
-    df_export = pd.concat([df_export, summary_df], ignore_index=True)
+        df_export = pd.concat([df_export, summary_df], ignore_index=True)
 
-    # Convert to CSV
-    csv_buffer = StringIO()
-    df_export.to_csv(csv_buffer, index=False)
-    csv_data = csv_buffer.getvalue()
+        csv_buffer = StringIO()
+        df_export.to_csv(csv_buffer, index=False)
+        csv_data = csv_buffer.getvalue()
 
-    # Generate file name using bill month
-    month = st.session_state.bill_month.strip().replace(" ", "_").lower() or "bill"
-    file_name = f"{month}_bill_by_m_zaid_naeem.csv"
+        month = st.session_state.bill_month.strip().replace(" ", "_").lower() or "bill"
+        file_name = f"{month}_bill_by_m_zaid_naeem.csv"
 
-    # Download button
-    st.download_button(
-        label=f"⬇️ Download Summary ({file_name})",
-        data=csv_data,
-        file_name=file_name,
-        mime="text/csv"
-    )
+        st.download_button(
+            label=f"⬇️ Download Summary ({file_name})",
+            data=csv_data,
+            file_name=file_name,
+            mime="text/csv"
+        )
